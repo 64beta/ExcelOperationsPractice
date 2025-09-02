@@ -22,14 +22,24 @@ namespace ExcelOperationsPractice.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("Lütfen bir excel dosyası yükleyin.");
 
-            var stopwatch = Stopwatch.StartNew();
+            var stopwatch1 = Stopwatch.StartNew();
 
             var employees = _excelService.ReadExcel(file);
 
-            stopwatch.Stop();
-            Console.WriteLine($"{stopwatch.Elapsed.TotalSeconds}");
+            stopwatch1.Stop();
+            Console.WriteLine($"Read File {stopwatch1.Elapsed.TotalSeconds}");
 
-            return Ok(employees); 
+
+
+
+
+            var stopwatch2 = Stopwatch.StartNew();
+            var coloredStream = _excelService.ColorSingleToGreen(file);
+            stopwatch2.Stop();
+            Console.WriteLine($"ColorSingleToGreen {stopwatch2.Elapsed.TotalSeconds}");
+            
+            return File(coloredStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ColoredEmployees.xlsx");
+            //return Ok(employees); 
         }
     }
 }

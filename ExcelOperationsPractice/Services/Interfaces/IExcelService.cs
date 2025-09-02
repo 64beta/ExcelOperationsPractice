@@ -5,5 +5,6 @@ namespace ExcelOperationsPractice.Services.Interfaces
     public interface IExcelService
     {
         List<EmployeeExcelDTO> ReadExcel(IFormFile file);
+        MemoryStream ColorSingleToGreen(IFormFile file);
     }
 }
