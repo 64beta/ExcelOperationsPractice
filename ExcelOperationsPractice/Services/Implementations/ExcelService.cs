@@ -77,6 +77,128 @@ namespace ExcelOperationsPractice.Services.Implementations
                 return outputStream;
             }
         }
+        public MemoryStream GenerateTemplateExcel<T>(
+    Dictionary<string, IEnumerable<(string Code, string Name)>> lookups,
+    int dataRows = 100
+)
+        {
+            var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("Main");
 
+            var props = typeof(T).GetProperties();
+            int col = 1;
+
+            foreach (var prop in props)
+            {
+                // Eğer property ...Code ile bitiyorsa ve lookup datası varsa
+                if (prop.Name.EndsWith("Code") && lookups.ContainsKey(prop.Name))
+                {
+                    var baseProp = prop.Name.Replace("Code", "");
+                    var baseName = prop.Name.Replace("Code", "Name");
+
+                    // Main sheet: önce Name sonra Code kolonları
+                    sheet.Cell(1, col).Value = baseName;
+                    sheet.Cell(1, col + 1).Value = prop.Name;
+
+                    // Başlık hücrelerini stilize et
+                    for (int headerCol = col; headerCol <= col + 1; headerCol++)
+                    {
+                        var headerCell = sheet.Cell(1, headerCol);
+                        headerCell.Style.Font.Bold = true;
+                        headerCell.Style.Font.FontSize = 11;
+                        headerCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                        headerCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                        headerCell.Style.Fill.BackgroundColor = XLColor.LightGray;
+                        headerCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                        headerCell.Style.Border.OutsideBorderColor = XLColor.Black;
+                    }
+
+                    // Lookup sheet oluştur / varsa al
+                    var lookupSheet = workbook.Worksheets.FirstOrDefault(ws => ws.Name == baseProp)
+                                      ?? workbook.AddWorksheet(baseProp);
+
+                    // Lookup başlıkları: Name ve Code
+                    lookupSheet.Cell(1, 1).Value = "Name";
+                    lookupSheet.Cell(1, 2).Value = "Code";
+                    for (int headerCol = 1; headerCol <= 2; headerCol++)
+                    {
+                        var headerCell = lookupSheet.Cell(1, headerCol);
+                        headerCell.Style.Font.Bold = true;
+                        headerCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                        headerCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                        headerCell.Style.Fill.BackgroundColor = XLColor.LightGray;
+                        headerCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                        headerCell.Style.Border.OutsideBorderColor = XLColor.Black;
+                    }
+
+                    var data = lookups[prop.Name].ToList();
+                    int startRow = 2; // başlık 1. satırda
+
+                    for (int i = 0; i < data.Count; i++)
+                    {
+                        lookupSheet.Cell(startRow + i, 1).Value = data[i].Name;
+                        lookupSheet.Cell(startRow + i, 2).Value = data[i].Code;
+                    }
+
+                    var lastRow = startRow + data.Count - 1;
+
+                    // Name kolonuna DataValidation (dropdown)
+                    var nameRange = sheet.Range(2, col, dataRows + 1, col);
+                    var lookupRange = lookupSheet.Range(startRow, 1, lastRow, 1);
+                    nameRange.SetDataValidation().List(lookupRange);
+
+                    // Code kolonuna VLOOKUP formülü (IFERROR ile)
+                    for (int row = 2; row <= dataRows + 1; row++)
+                    {
+                        var nameCell = sheet.Cell(row, col);
+                        var codeCell = sheet.Cell(row, col + 1);
+                        codeCell.FormulaA1 =
+                            $"=IFERROR(VLOOKUP({nameCell.Address}, '{baseProp}'!$A:$B, 2, FALSE), \"\")";
+                    }
+
+                    col += 2; // Name + Code
+                }
+                else
+                {
+                    // Normal kolon formatlama
+                    sheet.Cell(1, col).Value = prop.Name;
+                    sheet.Cell(1, col).Style.Font.Bold = true;
+                    sheet.Cell(1, col).Style.Fill.BackgroundColor = XLColor.LightGray;
+                    sheet.Cell(1, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    sheet.Cell(1, col).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+                    if (prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?))
+                        sheet.Column(col).Style.DateFormat.Format = "yyyy-MM-dd";
+                    else if (prop.PropertyType == typeof(int) || prop.PropertyType == typeof(int?))
+                        sheet.Column(col).Style.NumberFormat.Format = "0";
+                    else if (prop.PropertyType == typeof(decimal) || prop.PropertyType == typeof(decimal?))
+                        sheet.Column(col).Style.NumberFormat.Format = "#,##0.00";
+
+                    col++;
+                }
+            }
+
+            // Sütun genişliklerini otomatik ayarla
+            sheet.Columns().AdjustToContents();
+            foreach (var ws in workbook.Worksheets)
+                ws.Columns().AdjustToContents();
+
+            var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            stream.Position = 0;
+            return stream;
+        }
+
+
+
+
+        public List<EmployeeExcelDTO> ReadExcelParzival(IFormFile file)
+        {
+            throw new NotImplementedException();
+        }
+
+        
     }
+
 }
+

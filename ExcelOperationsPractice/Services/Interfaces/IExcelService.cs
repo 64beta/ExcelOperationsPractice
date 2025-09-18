@@ -7,6 +7,9 @@ namespace ExcelOperationsPractice.Services.Interfaces
         List<EmployeeExcelDTO> ReadExcel(IFormFile file);
         MemoryStream ColorSingleToGreen(IFormFile file);
         List<EmployeeExcelDTO> ReadExcelParzival(IFormFile file);
-        public IFormFile GetCustomTemplateParzival();
+        MemoryStream GenerateTemplateExcel<T>(
+            Dictionary<string, IEnumerable<(string Code, string Name)>> lookups,
+            int dataRows = 100
+        );
     }
 }

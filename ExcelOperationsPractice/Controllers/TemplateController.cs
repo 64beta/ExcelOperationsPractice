@@ -1,7 +1,10 @@
-﻿using ExcelOperationsPractice.Services.Interfaces;
+﻿using ExcelOperationsPractice.DTOs;
+using ExcelOperationsPractice.Services.Implementations;
+using ExcelOperationsPractice.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace ExcelOperationsPractice.Controllers
 {
@@ -54,6 +57,58 @@ namespace ExcelOperationsPractice.Controllers
             Console.WriteLine($"ColorSingleToGreen {stopwatch2.Elapsed.TotalSeconds}");
 
             return File(coloredStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ColoredEmployees.xlsx");
+        }
+        [HttpPost]
+        public async Task<IActionResult> CreateTemplateParzival()
+        {
+            
+
+            var stopwatch1 = Stopwatch.StartNew();
+
+            var lookups = new Dictionary<string, IEnumerable<(string Code, string Name)>>()
+{
+    {
+        "MeasurementCriteriaCode", new List<(string, string)>
+        {
+            ("100", "City Hospital"),
+            ("200", "Central Clinic"),
+            ("300", "Private Medical Center")
+        }
+    },{
+        "WarehouseCode", new List<(string, string)>
+        {
+            ("100", "City Hospital"),
+            ("200", "Central Clinic"),
+            ("300", "Private Medical Center")
+        }
+    },
+    {
+        "DepartmentCode", new List<(string, string)>
+        {
+            ("10", "Cardiology"),
+            ("20", "Neurology"),
+            ("30", "Orthopedics")
+        }
+    }
+};
+            var newTemplate = _excelService.GenerateTemplateExcel<MedicalExpenseDto>(lookups);
+
+            stopwatch1.Stop();
+            Console.WriteLine($"Read File {stopwatch1.Elapsed.TotalSeconds}");
+
+
+
+
+
+            var stopwatch2 = Stopwatch.StartNew();
+           
+
+
+
+            stopwatch2.Stop();
+            Console.WriteLine($"ColorSingleToGreen {stopwatch2.Elapsed.TotalSeconds}");
+
+            return File(newTemplate, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ColoredEmployees.xlsx");
         }
     }
 }
