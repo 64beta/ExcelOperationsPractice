@@ -38,7 +38,6 @@ namespace ExcelOperationsPractice.Services.Implementations
                             Code = row.Cell(3).GetString(),
                             Job = row.Cell(4).GetString(),
                             StatusCode = row.Cell(5).GetString(),
-                            MaritalStatus = row.Cell(6).GetString(),
 
                         };
                         employees.Add(dto);
@@ -78,10 +77,12 @@ namespace ExcelOperationsPractice.Services.Implementations
             }
         }
         public MemoryStream GenerateTemplateExcel<T>(
-    Dictionary<string, IEnumerable<(string Code, string Name)>> lookups,
-    int dataRows = 100
-)
+            Dictionary<string, IEnumerable<(string Code, string Name)>> lookups = null,
+            int dataRows = 100
+        )
         {
+            lookups ??= new Dictionary<string, IEnumerable<(string Code, string Name)>>();
+
             var workbook = new XLWorkbook();
             var sheet = workbook.Worksheets.Add("Main");
 
@@ -90,17 +91,16 @@ namespace ExcelOperationsPractice.Services.Implementations
 
             foreach (var prop in props)
             {
-                // Eğer property ...Code ile bitiyorsa ve lookup datası varsa
-                if (prop.Name.EndsWith("Code") && lookups.ContainsKey(prop.Name))
+                if (prop.Name.EndsWith("Code") &&
+                    lookups.ContainsKey(prop.Name) &&
+                    lookups[prop.Name] != null)
                 {
                     var baseProp = prop.Name.Replace("Code", "");
                     var baseName = prop.Name.Replace("Code", "Name");
 
-                    // Main sheet: önce Name sonra Code kolonları
                     sheet.Cell(1, col).Value = baseName;
                     sheet.Cell(1, col + 1).Value = prop.Name;
 
-                    // Başlık hücrelerini stilize et
                     for (int headerCol = col; headerCol <= col + 1; headerCol++)
                     {
                         var headerCell = sheet.Cell(1, headerCol);
@@ -113,11 +113,9 @@ namespace ExcelOperationsPractice.Services.Implementations
                         headerCell.Style.Border.OutsideBorderColor = XLColor.Black;
                     }
 
-                    // Lookup sheet oluştur / varsa al
                     var lookupSheet = workbook.Worksheets.FirstOrDefault(ws => ws.Name == baseProp)
                                       ?? workbook.AddWorksheet(baseProp);
 
-                    // Lookup başlıkları: Name ve Code
                     lookupSheet.Cell(1, 1).Value = "Name";
                     lookupSheet.Cell(1, 2).Value = "Code";
                     for (int headerCol = 1; headerCol <= 2; headerCol++)
@@ -132,7 +130,7 @@ namespace ExcelOperationsPractice.Services.Implementations
                     }
 
                     var data = lookups[prop.Name].ToList();
-                    int startRow = 2; // başlık 1. satırda
+                    int startRow = 2;
 
                     for (int i = 0; i < data.Count; i++)
                     {
@@ -142,12 +140,13 @@ namespace ExcelOperationsPractice.Services.Implementations
 
                     var lastRow = startRow + data.Count - 1;
 
-                    // Name kolonuna DataValidation (dropdown)
-                    var nameRange = sheet.Range(2, col, dataRows + 1, col);
-                    var lookupRange = lookupSheet.Range(startRow, 1, lastRow, 1);
-                    nameRange.SetDataValidation().List(lookupRange);
+                    if (data.Any())
+                    {
+                        var nameRange = sheet.Range(2, col, dataRows + 1, col);
+                        var lookupRange = lookupSheet.Range(startRow, 1, lastRow, 1);
+                        nameRange.SetDataValidation().List(lookupRange);
+                    }
 
-                    // Code kolonuna VLOOKUP formülü (IFERROR ile)
                     for (int row = 2; row <= dataRows + 1; row++)
                     {
                         var nameCell = sheet.Cell(row, col);
@@ -156,11 +155,10 @@ namespace ExcelOperationsPractice.Services.Implementations
                             $"=IFERROR(VLOOKUP({nameCell.Address}, '{baseProp}'!$A:$B, 2, FALSE), \"\")";
                     }
 
-                    col += 2; // Name + Code
+                    col += 2;
                 }
                 else
                 {
-                    // Normal kolon formatlama
                     sheet.Cell(1, col).Value = prop.Name;
                     sheet.Cell(1, col).Style.Font.Bold = true;
                     sheet.Cell(1, col).Style.Fill.BackgroundColor = XLColor.LightGray;
@@ -178,7 +176,6 @@ namespace ExcelOperationsPractice.Services.Implementations
                 }
             }
 
-            // Sütun genişliklerini otomatik ayarla
             sheet.Columns().AdjustToContents();
             foreach (var ws in workbook.Worksheets)
                 ws.Columns().AdjustToContents();
@@ -192,12 +189,101 @@ namespace ExcelOperationsPractice.Services.Implementations
 
 
 
-        public List<EmployeeExcelDTO> ReadExcelParzival(IFormFile file)
+
+        public List<T> ReadExcelParzival<T>(IFormFile file) where T : new()
         {
-            throw new NotImplementedException();
+            var result = new List<T>();
+
+            using var stream = new MemoryStream();
+            file.CopyTo(stream);
+            stream.Position = 0;
+
+            using var workbook = new XLWorkbook(stream);
+            var sheet = workbook.Worksheet("Main");
+            if (sheet == null)
+                throw new Exception("Excel dosyasında 'Main' isimli sheet bulunamadı.");
+
+            var headers = new Dictionary<int, string>();
+            int lastCol = sheet.LastColumnUsed().ColumnNumber();
+            for (int col = 1; col <= lastCol; col++)
+            {
+                var header = sheet.Cell(1, col).GetString();
+                if (!string.IsNullOrWhiteSpace(header))
+                    headers[col] = header;
+            }
+
+            int lastRow = sheet.LastRowUsed().RowNumber();
+
+            for (int row = 2; row <= lastRow; row++)
+            {
+                var dto = new T();
+                bool hasValue = false;
+
+                foreach (var kvp in headers)
+                {
+                    int col = kvp.Key;
+                    string header = kvp.Value;
+                    var prop = typeof(T).GetProperty(header);
+                    if (prop == null) continue;
+
+                    var cell = sheet.Cell(row, col);
+                    if (cell.IsEmpty()) continue;
+
+                    try
+                    {
+                        object? convertedValue = null;
+
+                        if (prop.PropertyType == typeof(string))
+                        {
+                            convertedValue = cell.GetString();
+                        }
+                        else if (prop.PropertyType == typeof(int) || prop.PropertyType == typeof(int?))
+                        {
+                            convertedValue = cell.TryGetValue<int>(out var intVal) ? intVal : (int?)null;
+                        }
+                        else if (prop.PropertyType == typeof(decimal) || prop.PropertyType == typeof(decimal?))
+                        {
+                            convertedValue = cell.TryGetValue<decimal>(out var decVal) ? decVal : (decimal?)null;
+                        }
+                        else if (prop.PropertyType == typeof(DateTime) || prop.PropertyType == typeof(DateTime?))
+                        {
+                            if (cell.DataType == XLDataType.DateTime)
+                            {
+                                convertedValue = cell.GetDateTime();
+                            }
+                            else if (DateTime.TryParse(cell.GetString(), out var dateVal))
+                            {
+                                convertedValue = dateVal;
+                            }
+                            else
+                            {
+                                convertedValue = prop.PropertyType == typeof(DateTime) ? DateTime.MinValue : (DateTime?)null;
+                            }
+                        }
+                        else
+                        {
+                            convertedValue = cell.Value.ToString();
+                        }
+
+                        if (convertedValue != null && !(convertedValue is string s && string.IsNullOrWhiteSpace(s)))
+                            hasValue = true;
+
+                        prop.SetValue(dto, convertedValue);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (hasValue)
+                    result.Add(dto);
+            }
+
+            return result;
         }
 
-        
+
+
     }
 
 }

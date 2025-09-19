@@ -8,6 +8,5 @@
         public string Code { get; set; }
         public string Job { get; set; }
         public string StatusCode { get; set; }
-        public string MaritalStatus { get; set; }
     }
 }

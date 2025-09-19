@@ -1,10 +1,7 @@
 ﻿using ExcelOperationsPractice.DTOs;
-using ExcelOperationsPractice.Services.Implementations;
 using ExcelOperationsPractice.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
-using System.Threading.Tasks;
 
 namespace ExcelOperationsPractice.Controllers
 {
@@ -31,8 +28,8 @@ namespace ExcelOperationsPractice.Controllers
 
             stopwatch1.Stop();
             Console.WriteLine($"Read File {stopwatch1.Elapsed.TotalSeconds}");
-            
-            return Ok(employees); 
+
+            return Ok(employees);
         }
         [HttpPost]
         public IActionResult ValidateExcel(IFormFile file)
@@ -61,7 +58,7 @@ namespace ExcelOperationsPractice.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateTemplateParzival()
         {
-            
+
 
             var stopwatch1 = Stopwatch.StartNew();
 
@@ -94,20 +91,37 @@ namespace ExcelOperationsPractice.Controllers
             var newTemplate = _excelService.GenerateTemplateExcel<MedicalExpenseDto>(lookups);
 
             stopwatch1.Stop();
+            Console.WriteLine($"Generate File {stopwatch1.Elapsed.TotalSeconds}");
+            return File(newTemplate, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ColoredEmployees.xlsx");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ReadTemplateParzival(IFormFile file)
+        {
+
+
+            var stopwatch1 = Stopwatch.StartNew();
+
+
+            List<MedicalExpenseDto> result = _excelService.ReadExcelParzival<MedicalExpenseDto>(file);
+
+            stopwatch1.Stop();
             Console.WriteLine($"Read File {stopwatch1.Elapsed.TotalSeconds}");
 
+            return Ok(result);
+        }
+        [HttpPost]
+        public async Task<IActionResult> CreateTemplateParzival2()
+        {
 
 
+            var stopwatch1 = Stopwatch.StartNew();
 
+            
+            var newTemplate = _excelService.GenerateTemplateExcel<EmployeeExcelDTO>();
 
-            var stopwatch2 = Stopwatch.StartNew();
-           
-
-
-
-            stopwatch2.Stop();
-            Console.WriteLine($"ColorSingleToGreen {stopwatch2.Elapsed.TotalSeconds}");
-
+            stopwatch1.Stop();
+            Console.WriteLine($"Generate File {stopwatch1.Elapsed.TotalSeconds}");
             return File(newTemplate, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ColoredEmployees.xlsx");
         }
     }
